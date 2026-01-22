@@ -1,0 +1,182 @@
+# DocumentGen Docker 构建和运行脚本 (Windows PowerShell)
+
+param(
+    [Parameter(Position=0)]
+    [string]$Action = "build"
+)
+
+# 颜色输出函数
+function Write-ColorOutput($ForegroundColor) {
+    $fc = $host.UI.RawUI.ForegroundColor
+    $host.UI.RawUI.ForegroundColor = $ForegroundColor
+    if ($args) {
+        Write-Output $args
+    }
+    $host.UI.RawUI.ForegroundColor = $fc
+}
+
+# 脚本目录
+$ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+Set-Location $ScriptDir
+
+Write-ColorOutput Green "========================================"
+Write-ColorOutput Green "DocumentGen Docker 构建和运行脚本"
+Write-ColorOutput Green "========================================"
+Write-Output ""
+
+# 检查Docker是否安装
+try {
+    $null = docker --version 2>&1
+} catch {
+    Write-ColorOutput Red "错误: 未找到Docker，请先安装Docker Desktop"
+    exit 1
+}
+
+# 检查Docker Compose是否安装
+$dockerComposeCmd = $null
+try {
+    $null = docker compose version 2>&1
+    $dockerComposeCmd = "docker compose"
+} catch {
+    try {
+        $null = docker-compose --version 2>&1
+        $dockerComposeCmd = "docker-compose"
+    } catch {
+        Write-ColorOutput Red "错误: 未找到Docker Compose，请先安装Docker Compose"
+        exit 1
+    }
+}
+
+# 执行操作
+switch ($Action.ToLower()) {
+    "build" {
+        Write-ColorOutput Yellow "开始构建Docker镜像..."
+        Write-Output ""
+        
+        Write-ColorOutput Yellow "构建后端镜像..."
+        docker build -t documentgen-backend:latest -f Dockerfile .
+        
+        if ($LASTEXITCODE -ne 0) {
+            Write-ColorOutput Red "后端镜像构建失败"
+            exit 1
+        }
+        
+        Write-ColorOutput Yellow "构建前端镜像..."
+        docker build -t documentgen-frontend:latest -f swagger-admin/Dockerfile swagger-admin/
+        
+        if ($LASTEXITCODE -ne 0) {
+            Write-ColorOutput Red "前端镜像构建失败"
+            exit 1
+        }
+        
+        Write-ColorOutput Green "所有镜像构建完成！"
+        Write-Output ""
+        $response = Read-Host "是否现在启动服务? (y/n)"
+        if ($response -match "^[yY]") {
+            $Action = "start"
+        } else {
+            exit 0
+        }
+    }
+    
+    "start" {
+        Write-ColorOutput Yellow "启动所有服务..."
+        Invoke-Expression "$dockerComposeCmd up -d"
+        
+        if ($LASTEXITCODE -eq 0) {
+            Write-ColorOutput Green "服务启动成功！"
+            Write-Output ""
+            Write-ColorOutput Green "服务访问地址:"
+            Write-Output "  前端: http://localhost"
+            Write-Output "  后端: http://localhost:8080"
+            Write-Output "  Redis: localhost:6379"
+            Write-Output ""
+            Write-ColorOutput Yellow "查看日志: $dockerComposeCmd logs -f"
+            Write-ColorOutput Yellow "停止服务: $dockerComposeCmd down"
+        } else {
+            Write-ColorOutput Red "服务启动失败"
+            exit 1
+        }
+    }
+    
+    "stop" {
+        Write-ColorOutput Yellow "停止所有服务..."
+        Invoke-Expression "$dockerComposeCmd down"
+        Write-ColorOutput Green "服务已停止"
+    }
+    
+    "restart" {
+        Write-ColorOutput Yellow "重启所有服务..."
+        Invoke-Expression "$dockerComposeCmd restart"
+        Write-ColorOutput Green "服务已重启"
+    }
+    
+    "logs" {
+        Write-ColorOutput Yellow "查看服务日志..."
+        Invoke-Expression "$dockerComposeCmd logs -f"
+    }
+    
+    "clean" {
+        Write-ColorOutput Yellow "清理Docker资源..."
+        Write-ColorOutput Yellow "这将删除所有容器、镜像和卷，是否继续? (y/n)"
+        $response = Read-Host
+        if ($response -match "^[yY]") {
+            Invoke-Expression "$dockerComposeCmd down -v"
+            docker rmi documentgen-backend:latest documentgen-frontend:latest 2>$null
+            Write-ColorOutput Green "清理完成"
+        } else {
+            Write-ColorOutput Yellow "已取消清理"
+        }
+    }
+    
+    "rebuild" {
+        Write-ColorOutput Yellow "重新构建并启动服务..."
+        Invoke-Expression "$dockerComposeCmd down"
+        Invoke-Expression "$dockerComposeCmd build --no-cache"
+        Invoke-Expression "$dockerComposeCmd up -d"
+        Write-ColorOutput Green "重新构建并启动完成"
+    }
+    
+    default {
+        Write-ColorOutput Red "未知操作: $Action"
+        Write-Output ""
+        Write-Output "用法: .\build-and-run.ps1 [操作]"
+        Write-Output ""
+        Write-Output "可用操作:"
+        Write-Output "  build    - 构建Docker镜像"
+        Write-Output "  start    - 启动所有服务"
+        Write-Output "  stop     - 停止所有服务"
+        Write-Output "  restart  - 重启所有服务"
+        Write-Output "  logs     - 查看服务日志"
+        Write-Output "  clean    - 清理所有Docker资源"
+        Write-Output "  rebuild  - 重新构建并启动服务"
+        Write-Output ""
+        Write-Output "示例:"
+        Write-Output "  .\build-and-run.ps1 build    # 构建镜像"
+        Write-Output "  .\build-and-run.ps1 start    # 启动服务"
+        Write-Output "  .\build-and-run.ps1 rebuild  # 重新构建并启动"
+        exit 1
+    }
+}
+
+# 如果build后选择了start，继续执行start
+if ($Action -eq "start") {
+    Write-ColorOutput Yellow "启动所有服务..."
+    Invoke-Expression "$dockerComposeCmd up -d"
+    
+    if ($LASTEXITCODE -eq 0) {
+        Write-ColorOutput Green "服务启动成功！"
+        Write-Output ""
+        Write-ColorOutput Green "服务访问地址:"
+        Write-Output "  前端: http://localhost"
+        Write-Output "  后端: http://localhost:8080"
+        Write-Output "  Redis: localhost:6379"
+        Write-Output ""
+        Write-ColorOutput Yellow "查看日志: $dockerComposeCmd logs -f"
+        Write-ColorOutput Yellow "停止服务: $dockerComposeCmd down"
+    } else {
+        Write-ColorOutput Red "服务启动失败"
+        exit 1
+    }
+}
+

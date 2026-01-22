@@ -1,0 +1,98 @@
+version: '3.8'
+
+services:
+  # Redis服务
+  redis:
+    image: redis:7-alpine
+    container_name: documentgen-redis-prod
+    ports:
+      - "6379:6379"
+    command: redis-server --requirepass ${REDIS_PASSWORD:-Nucleus!}
+    volumes:
+      - redis-data-prod:/data
+    networks:
+      - documentgen-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 256M
+
+  # 后端服务
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: documentgen-backend-prod
+    ports:
+      - "8080:8080"
+    environment:
+      - SPRING_DATA_REDIS_HOST=redis
+      - SPRING_DATA_REDIS_PORT=6379
+      - SPRING_DATA_REDIS_PASSWORD=${REDIS_PASSWORD:-Nucleus!}
+      - SPRING_DATA_REDIS_DATABASE=0
+      - GENEW_DOCUMENT_OUTPUT_PATH=/var/numax/genew
+      - GENEW_SERVER_URL=${GENEW_SERVER_URL:-https://newdev.rdapp.com:53839/swagger/swagger-resources}
+    volumes:
+      - document-output-prod:/var/numax/genew
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - documentgen-network
+    restart: always
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/"]
+      interval: 30s
+      timeout: 10s
+      start_period: 60s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+        reservations:
+          memory: 1G
+
+  # 前端服务
+  frontend:
+    build:
+      context: ./swagger-admin
+      dockerfile: Dockerfile
+    container_name: documentgen-frontend-prod
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    networks:
+      - documentgen-network
+    restart: always
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+        reservations:
+          memory: 128M
+
+volumes:
+  redis-data-prod:
+    driver: local
+  document-output-prod:
+    driver: local
+
+networks:
+  documentgen-network:
+    driver: bridge
+

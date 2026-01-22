@@ -1,0 +1,81 @@
+version: '3.8'
+
+services:
+  # Redis服务
+  redis:
+    image: redis:7-alpine
+    container_name: documentgen-redis
+    ports:
+      - "6379:6379"
+    command: redis-server --requirepass Nucleus!
+    volumes:
+      - redis-data:/data
+    networks:
+      - documentgen-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+  # 后端服务
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: documentgen-backend
+    ports:
+      - "8080:8080"
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - SPRING_DATA_REDIS_HOST=redis
+      - SPRING_DATA_REDIS_PORT=6379
+      - SPRING_DATA_REDIS_PASSWORD=Nucleus!
+      - SPRING_DATA_REDIS_DATABASE=0
+      - GENEW_DOCUMENT_OUTPUT_PATH=/var/numax/genew
+      - GENEW_SERVER_URL=https://newdev.rdapp.com:53839/swagger/swagger-resources
+    volumes:
+      - document-output:/var/numax/genew
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - documentgen-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/"]
+      interval: 30s
+      timeout: 10s
+      start_period: 60s
+      retries: 3
+
+  # 前端服务
+  frontend:
+    build:
+      context: ./swagger-admin
+      dockerfile: Dockerfile
+    container_name: documentgen-frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    networks:
+      - documentgen-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  redis-data:
+    driver: local
+  document-output:
+    driver: local
+
+networks:
+  documentgen-network:
+    driver: bridge
+

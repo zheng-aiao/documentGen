@@ -21,7 +21,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import TopNavbar from './TopNavbar.vue'
 import Sidebar from './Sidebar.vue'
