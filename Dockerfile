@@ -68,11 +68,11 @@ RUN chown -R appuser:appuser /app
 USER appuser
 
 # 暴露端口
-EXPOSE 8080
+EXPOSE 9001
 
 # 健康检查（如果actuator不可用，使用根路径）
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-    CMD curl -f http://localhost:8080/ || exit 1
+    CMD curl -f http://localhost:9001/ || exit 1
 
 # 启动应用（激活docker profile）
 ENTRYPOINT ["java", "-jar", "-Dspring.profiles.active=docker", "app.jar"]

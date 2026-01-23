@@ -66,7 +66,7 @@ documentGen/
 ### 后端镜像 (documentgen-backend)
 - **基础镜像**: `eclipse-temurin:17-jre-alpine`
 - **构建镜像**: `maven:3.9.4`
-- **端口**: 8080
+- **端口**: 9001
 - **特点**: 
   - 多阶段构建，减小镜像体积
   - 非root用户运行，提高安全性
@@ -151,7 +151,7 @@ docker-compose up -d --build
 启动成功后，可以通过以下地址访问：
 
 - **前端**: http://localhost
-- **后端API**: http://localhost:8080
+- **后端API**: http://localhost:9001
 - **Redis**: localhost:6379
 
 ## ⚙️ 环境配置
@@ -198,15 +198,98 @@ docker volume inspect documentgen_redis-data
 docker volume inspect documentgen_document-output
 ```
 
+## 🚚 迁移
+
+### 导出所有相关镜像
+
+在源服务器上，导出所有镜像（包括基础镜像，适用于离线环境）：
+
+```bash
+# 导出所有镜像到单个文件
+docker save \
+  documentgen-backend:latest \
+  documentgen-frontend:latest \
+  eclipse-temurin:17-jre-alpine \
+  maven:3.9-eclipse-temurin-17 \
+  nginx:alpine \
+  node:20-alpine \
+  redis:7-alpine \
+  -o documentgen-all-images.tar
+```
+
+### 导出卷数据（可选，如果需要保留数据）
+
+```bash
+# 停止服务（确保数据一致性）
+docker-compose down
+
+# 导出 Redis 数据
+docker run --rm -v documentgen_redis-data:/data -v $(pwd):/backup alpine \
+  tar czf /backup/redis-data.tar.gz -C /data .
+
+# 导出文档输出数据
+docker run --rm -v documentgen_document-output:/data -v $(pwd):/backup alpine \
+  tar czf /backup/document-output.tar.gz -C /data .
+```
+
+### 在新服务器上导入
+
+```bash
+# 1. 导入镜像
+docker load -i documentgen-all-images.tar
+
+# 2. 如果导出了卷数据，先启动服务创建卷，然后恢复数据
+docker-compose up -d
+docker-compose down
+
+# 恢复 Redis 数据
+docker run --rm -v documentgen_redis-data:/data -v $(pwd):/backup alpine \
+  sh -c "cd /data && tar xzf /backup/redis-data.tar.gz"
+
+# 恢复文档输出数据
+docker run --rm -v documentgen_document-output:/data -v $(pwd):/backup alpine \
+  sh -c "cd /data && tar xzf /backup/document-output.tar.gz"
+
+# 3. 启动服务
+# Linux/Mac
+./build-and-run.sh start
+
+# Windows
+build-and-run.bat start
+
+# 或使用 docker-compose
+docker-compose up -d
+```
+
+### 检查迁移结果
+
+```bash
+# 检查镜像是否导入成功
+docker images | grep documentgen
+
+# 检查容器是否正常运行
+docker ps
+
+# 或使用 docker-compose
+docker-compose ps
+```
+
+### 注意事项
+
+1. **如果新服务器有网络**：可以只导出自定义镜像（`documentgen-backend:latest` 和 `documentgen-frontend:latest`），基础镜像会自动从 Docker Hub 拉取
+2. **如果新服务器无网络**：必须导出所有镜像，包括基础镜像
+3. **卷数据迁移**：如果不需要保留历史数据，可以跳过卷数据导出步骤，直接启动新服务
+4. **文件传输**：使用 `scp`、`rsync` 或其他方式将 tar 文件传输到新服务器
+
 ## 🔍 故障排查
 
 ### 1. 端口被占用
 
-如果8080或80端口被占用，可以修改 `docker-compose.yml` 中的端口映射：
+如果9001或80端口被占用，可以修改 `docker-compose.yml` 中的端口映射：
 
 ```yaml
 ports:
-  - "8081:8080"  # 改为8081
+  - "9002:9001"  # 改为9002
 ```
 
 ### 2. 后端无法连接Redis

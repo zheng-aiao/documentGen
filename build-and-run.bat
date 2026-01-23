@@ -123,7 +123,7 @@ if errorlevel 1 (
     echo.
     echo [INFO] Service access addresses:
     echo   Frontend: http://localhost
-    echo   Backend: http://localhost:8080
+    echo   Backend: http://localhost:9001
     echo   Redis: localhost:6379
     echo.
     echo [TIP] View logs: %DOCKER_COMPOSE_CMD% logs -f
