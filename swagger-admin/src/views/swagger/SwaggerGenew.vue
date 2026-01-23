@@ -97,7 +97,7 @@
     <el-dialog v-model="settings.visible" title="系统设置" width="560px" :close-on-click-modal="false">
       <el-form :model="settings.form" :rules="settings.rules" ref="settingsFormRef" label-width="120px">
         <el-form-item label="文档服务地址" prop="docServiceUrl">
-          <el-input v-model="settings.form.docServiceUrl" placeholder="例如：https://newdev.rdapp.com:53839/swagger/swagger-resources" />
+          <el-input v-model="settings.form.docServiceUrl" placeholder="例如：/swagger/swagger-resources 或 https://newdev.rdapp.com:53839/swagger/swagger-resources" />
         </el-form-item>
         <el-form-item label="name字段" prop="name">
           <el-input v-model="settings.form.name" placeholder="document.name" />
@@ -159,7 +159,7 @@ const pagedServices = computed(() => {
 const settings = reactive({
   visible: false,
   form: {
-    docServiceUrl: 'https://newdev.rdapp.com:53839/swagger/swagger-resources',
+    docServiceUrl: '/swagger/swagger-resources',
     name: 'document.name',
     url: 'document.url'
   },
@@ -207,12 +207,26 @@ function ensureSettingsOrAsk(): boolean {
 }
 
 function resolveUrlForRequest(rawUrl: string): string {
+  if (!rawUrl) return '/swagger/swagger-resources'
+  
   try {
-    if (import.meta.env.DEV && rawUrl.startsWith('http')) {
-      return rawUrl.replace(/^https?:\/\/[^/]+/, '')
+    // 如果是完整URL，转换为相对路径以通过nginx/vite代理
+    if (rawUrl.startsWith('http://') || rawUrl.startsWith('https://')) {
+      // 提取路径部分，通过代理访问
+      const urlObj = new URL(rawUrl)
+      const path = urlObj.pathname + (urlObj.search || '')
+      // 确保路径以 / 开头
+      const resolvedPath = path.startsWith('/') ? path : '/' + path
+      console.log('Resolved URL:', rawUrl, '->', resolvedPath)
+      return resolvedPath
     }
-  } catch {}
-  return rawUrl
+  } catch (e) {
+    console.warn('Failed to resolve URL:', rawUrl, e)
+  }
+  // 确保相对路径以 / 开头
+  const finalPath = rawUrl.startsWith('/') ? rawUrl : '/' + rawUrl
+  console.log('Using relative path:', finalPath)
+  return finalPath
 }
 
 function getByPath(obj: any, path: string): any {
@@ -254,7 +268,11 @@ async function loadServices(payload?: any[]) {
     let data = payload
     if (!data) {
       const url = resolveUrlForRequest(settings.form.docServiceUrl)
-      const resp = await axios.get(url, { withCredentials: true })
+      console.log('Requesting URL:', url)
+      const resp = await axios.get(url, { 
+        withCredentials: false, // 使用 * 作为 CORS origin 时不能使用 credentials
+        timeout: 30000
+      })
       data = resp.data
     }
     let list = mapResponseToServices(Array.isArray(data) ? data : [])
@@ -262,8 +280,12 @@ async function loadServices(payload?: any[]) {
     const maxPage = Math.max(1, Math.ceil(services.value.length / pagination.pageSize))
     if (pagination.page > maxPage) pagination.page = maxPage
     ElMessage.success('加载完成')
-  } catch (e) {
-    ElMessage.error('加载失败，请检查服务配置或网络')
+  } catch (e: any) {
+    console.error('Load services error:', e)
+    const errorMsg = e?.response?.status 
+      ? `加载失败: ${e.response.status} ${e.response.statusText}` 
+      : e?.message || '加载失败，请检查服务配置或网络'
+    ElMessage.error(errorMsg)
   } finally {
     loadingServices.value = false
   }

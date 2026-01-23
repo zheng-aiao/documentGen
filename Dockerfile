@@ -34,22 +34,32 @@ RUN mvn clean package -DskipTests
 # 运行阶段
 FROM eclipse-temurin:17-jre-alpine
 
-# 安装curl用于健康检查
-RUN apk add --no-cache curl
+# 安装curl用于健康检查，安装fontconfig和字体工具
+RUN apk add --no-cache curl fontconfig ttf-dejavu ttf-liberation
 
 # 创建应用目录和用户
 RUN addgroup -g 1000 appuser && \
     adduser -D -u 1000 -G appuser appuser
 
-# 创建文档输出目录
+# 创建文档输出目录和字体目录
 RUN mkdir -p /var/numax/genew && \
-    chown -R appuser:appuser /var/numax
+    mkdir -p /usr/local/nuas-rest/conf/chinese-font && \
+    chown -R appuser:appuser /var/numax && \
+    chown -R appuser:appuser /usr/local/nuas-rest
 
 # 设置工作目录
 WORKDIR /app
 
 # 从构建阶段复制 JAR 文件
 COPY --from=builder /app/target/*.jar app.jar
+
+# 复制中文字体文件到容器（在切换用户之前，以便设置权限）
+COPY src/main/resources/chinese-font/ /usr/local/nuas-rest/conf/chinese-font/
+
+# 更新字体缓存并设置权限（虽然 Aspose 直接读取字体文件，但为了系统兼容性还是更新一下）
+RUN fc-cache -fv /usr/local/nuas-rest/conf/chinese-font/ 2>/dev/null || true && \
+    chmod -R 755 /usr/local/nuas-rest/conf/chinese-font && \
+    chown -R appuser:appuser /usr/local/nuas-rest/conf/chinese-font
 
 # 更改文件所有者
 RUN chown -R appuser:appuser /app

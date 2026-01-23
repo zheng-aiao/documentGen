@@ -36,6 +36,7 @@ fi
 
 # 解析命令行参数
 ACTION=${1:-build}
+SERVICE=${2:-}
 
 case $ACTION in
     build)
@@ -69,6 +70,46 @@ case $ACTION in
         fi
         ;;
     
+    build-backend)
+        echo -e "${YELLOW}开始构建后端镜像...${NC}"
+        docker build -t documentgen-backend:latest -f Dockerfile .
+        
+        if [ $? -ne 0 ]; then
+            echo -e "${RED}后端镜像构建失败${NC}"
+            exit 1
+        fi
+        
+        echo -e "${GREEN}后端镜像构建完成！${NC}"
+        echo ""
+        echo -e "${YELLOW}是否现在重启后端服务? (y/n)${NC}"
+        read -r response
+        if [[ "$response" =~ ^([yY][eE][sS]|[yY])$ ]]; then
+            $DOCKER_COMPOSE up -d --build backend
+            echo -e "${GREEN}后端服务已重启${NC}"
+        fi
+        exit 0
+        ;;
+    
+    build-frontend)
+        echo -e "${YELLOW}开始构建前端镜像...${NC}"
+        docker build -t documentgen-frontend:latest -f swagger-admin/Dockerfile swagger-admin/
+        
+        if [ $? -ne 0 ]; then
+            echo -e "${RED}前端镜像构建失败${NC}"
+            exit 1
+        fi
+        
+        echo -e "${GREEN}前端镜像构建完成！${NC}"
+        echo ""
+        echo -e "${YELLOW}是否现在重启前端服务? (y/n)${NC}"
+        read -r response
+        if [[ "$response" =~ ^([yY][eE][sS]|[yY])$ ]]; then
+            $DOCKER_COMPOSE up -d --build frontend
+            echo -e "${GREEN}前端服务已重启${NC}"
+        fi
+        exit 0
+        ;;
+    
     start)
         echo -e "${YELLOW}启动所有服务...${NC}"
         $DOCKER_COMPOSE up -d
@@ -81,8 +122,8 @@ case $ACTION in
             echo -e "  后端: ${GREEN}http://localhost:8080${NC}"
             echo -e "  Redis: ${GREEN}localhost:6379${NC}"
             echo ""
-            echo -e "${YELLOW}查看日志: ${NC}docker-compose logs -f"
-            echo -e "${YELLOW}停止服务: ${NC}docker-compose down"
+            echo -e "${YELLOW}查看日志: ${NC}$DOCKER_COMPOSE logs -f"
+            echo -e "${YELLOW}停止服务: ${NC}$DOCKER_COMPOSE down"
         else
             echo -e "${RED}服务启动失败${NC}"
             exit 1
@@ -101,9 +142,26 @@ case $ACTION in
         echo -e "${GREEN}服务已重启${NC}"
         ;;
     
+    restart-backend)
+        echo -e "${YELLOW}重启后端服务...${NC}"
+        $DOCKER_COMPOSE restart backend
+        echo -e "${GREEN}后端服务已重启${NC}"
+        ;;
+    
+    restart-frontend)
+        echo -e "${YELLOW}重启前端服务...${NC}"
+        $DOCKER_COMPOSE restart frontend
+        echo -e "${GREEN}前端服务已重启${NC}"
+        ;;
+    
     logs)
-        echo -e "${YELLOW}查看服务日志...${NC}"
-        $DOCKER_COMPOSE logs -f
+        if [ -z "$SERVICE" ]; then
+            echo -e "${YELLOW}查看所有服务日志...${NC}"
+            $DOCKER_COMPOSE logs -f
+        else
+            echo -e "${YELLOW}查看 $SERVICE 服务日志...${NC}"
+            $DOCKER_COMPOSE logs -f "$SERVICE"
+        fi
         ;;
     
     clean)
@@ -130,22 +188,49 @@ case $ACTION in
     *)
         echo -e "${RED}未知操作: $ACTION${NC}"
         echo ""
-        echo "用法: $0 [操作]"
+        echo "用法: $0 [操作] [服务名]"
         echo ""
         echo "可用操作:"
-        echo "  build    - 构建Docker镜像"
-        echo "  start    - 启动所有服务"
-        echo "  stop     - 停止所有服务"
-        echo "  restart  - 重启所有服务"
-        echo "  logs     - 查看服务日志"
-        echo "  clean    - 清理所有Docker资源"
-        echo "  rebuild  - 重新构建并启动服务"
+        echo "  build              - 构建所有Docker镜像"
+        echo "  build-backend      - 只构建后端镜像"
+        echo "  build-frontend     - 只构建前端镜像"
+        echo "  start              - 启动所有服务"
+        echo "  stop               - 停止所有服务"
+        echo "  restart            - 重启所有服务"
+        echo "  restart-backend    - 只重启后端服务"
+        echo "  restart-frontend   - 只重启前端服务"
+        echo "  logs [服务名]      - 查看服务日志（不指定服务名则查看所有）"
+        echo "  clean              - 清理所有Docker资源"
+        echo "  rebuild            - 重新构建并启动所有服务"
         echo ""
         echo "示例:"
-        echo "  $0 build    # 构建镜像"
-        echo "  $0 start    # 启动服务"
-        echo "  $0 rebuild  # 重新构建并启动"
+        echo "  $0 build              # 构建所有镜像"
+        echo "  $0 build-backend      # 只构建后端"
+        echo "  $0 build-frontend     # 只构建前端"
+        echo "  $0 restart-backend    # 只重启后端"
+        echo "  $0 restart-frontend   # 只重启前端"
+        echo "  $0 logs backend       # 查看后端日志"
         exit 1
         ;;
 esac
 
+# 如果build后选择了start，继续执行start
+if [ "$ACTION" = "start" ]; then
+    echo -e "${YELLOW}启动所有服务...${NC}"
+    $DOCKER_COMPOSE up -d
+    
+    if [ $? -eq 0 ]; then
+        echo -e "${GREEN}服务启动成功！${NC}"
+        echo ""
+        echo -e "${GREEN}服务访问地址:${NC}"
+        echo -e "  前端: ${GREEN}http://localhost${NC}"
+        echo -e "  后端: ${GREEN}http://localhost:8080${NC}"
+        echo -e "  Redis: ${GREEN}localhost:6379${NC}"
+        echo ""
+        echo -e "${YELLOW}查看日志: ${NC}$DOCKER_COMPOSE logs -f"
+        echo -e "${YELLOW}停止服务: ${NC}$DOCKER_COMPOSE down"
+    else
+        echo -e "${RED}服务启动失败${NC}"
+        exit 1
+    fi
+fi

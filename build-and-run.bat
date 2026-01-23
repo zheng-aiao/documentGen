@@ -1,32 +1,32 @@
 @echo off
-REM DocumentGen Docker 构建和运行脚�?(Windows Batch)
-REM 设置代码页为GBK以正确显示中文（中文Windows默认编码�?
-chcp 936 >nul 2>&1
+REM DocumentGen Docker Build and Run Script (Windows Batch)
+REM Fix Chinese encoding issue by using UTF-8
+chcp 65001 >nul 2>&1
 
 setlocal enabledelayedexpansion
 
-REM 脚本目录
+REM Script directory
 cd /d "%~dp0"
 
 echo ========================================
-echo DocumentGen Docker 构建和运行脚�?
+echo DocumentGen Docker Build and Run Script
 echo ========================================
 echo.
 
-REM 检查Docker是否安装
+REM Check if Docker is installed
 docker --version >nul 2>&1
 if errorlevel 1 (
-    echo [错误] 未找到Docker，请先安装Docker Desktop
+    echo [ERROR] Docker not found, please install Docker Desktop first
     exit /b 1
 )
 
-REM 检查Docker Compose是否安装
+REM Check if Docker Compose is installed
 set DOCKER_COMPOSE_CMD=
 docker compose version >nul 2>&1
 if errorlevel 1 (
     docker-compose --version >nul 2>&1
     if errorlevel 1 (
-        echo [错误] 未找到Docker Compose，请先安装Docker Compose
+        echo [ERROR] Docker Compose not found, please install Docker Compose first
         exit /b 1
     ) else (
         set DOCKER_COMPOSE_CMD=docker-compose
@@ -35,39 +35,44 @@ if errorlevel 1 (
     set DOCKER_COMPOSE_CMD=docker compose
 )
 
-REM 解析命令行参�?
+REM Parse command line arguments
 set ACTION=%1
+set SERVICE=%2
 if "%ACTION%"=="" set ACTION=build
 
 if /i "%ACTION%"=="build" goto :build
+if /i "%ACTION%"=="build-backend" goto :build_backend
+if /i "%ACTION%"=="build-frontend" goto :build_frontend
 if /i "%ACTION%"=="start" goto :start
 if /i "%ACTION%"=="stop" goto :stop
 if /i "%ACTION%"=="restart" goto :restart
+if /i "%ACTION%"=="restart-backend" goto :restart_backend
+if /i "%ACTION%"=="restart-frontend" goto :restart_frontend
 if /i "%ACTION%"=="logs" goto :logs
 if /i "%ACTION%"=="clean" goto :clean
 if /i "%ACTION%"=="rebuild" goto :rebuild
 goto :usage
 
 :build
-echo [信息] 开始构建Docker镜像...
+echo [INFO] Building all Docker images...
 echo.
-echo [信息] 构建后端镜像...
+echo [INFO] Building backend image...
 docker build -t documentgen-backend:latest -f Dockerfile .
 if errorlevel 1 (
-    echo [错误] 后端镜像构建失败
+    echo [ERROR] Backend image build failed
     exit /b 1
 )
 
-echo [信息] 构建前端镜像...
+echo [INFO] Building frontend image...
 docker build -t documentgen-frontend:latest -f swagger-admin/Dockerfile swagger-admin/
 if errorlevel 1 (
-    echo [错误] 前端镜像构建失败
+    echo [ERROR] Frontend image build failed
     exit /b 1
 )
 
-echo [成功] 所有镜像构建完成！
+echo [SUCCESS] All images built successfully!
 echo.
-set /p response="是否现在启动服务? (y/n): "
+set /p response="Start services now? (y/n): "
 if /i "!response!"=="y" (
     set ACTION=start
     goto :start
@@ -75,84 +80,138 @@ if /i "!response!"=="y" (
     exit /b 0
 )
 
+:build_backend
+echo [INFO] Building backend image...
+docker build -t documentgen-backend:latest -f Dockerfile .
+if errorlevel 1 (
+    echo [ERROR] Backend image build failed
+    exit /b 1
+)
+echo [SUCCESS] Backend image built successfully!
+echo.
+set /p response="Restart backend service now? (y/n): "
+if /i "!response!"=="y" (
+    call %DOCKER_COMPOSE_CMD% up -d --build backend
+    echo [SUCCESS] Backend service restarted
+)
+goto :end
+
+:build_frontend
+echo [INFO] Building frontend image...
+docker build -t documentgen-frontend:latest -f swagger-admin/Dockerfile swagger-admin/
+if errorlevel 1 (
+    echo [ERROR] Frontend image build failed
+    exit /b 1
+)
+echo [SUCCESS] Frontend image built successfully!
+echo.
+set /p response="Restart frontend service now? (y/n): "
+if /i "!response!"=="y" (
+    call %DOCKER_COMPOSE_CMD% up -d --build frontend
+    echo [SUCCESS] Frontend service restarted
+)
+goto :end
+
 :start
-echo [信息] 启动所有服�?..
+echo [INFO] Starting all services...
 call %DOCKER_COMPOSE_CMD% up -d
 if errorlevel 1 (
-    echo [错误] 服务启动失败
+    echo [ERROR] Failed to start services
     exit /b 1
 ) else (
-    echo [成功] 服务启动成功�?
+    echo [SUCCESS] Services started successfully!
     echo.
-    echo [信息] 服务访问地址:
-    echo   前端: http://localhost
-    echo   后端: http://localhost:8080
+    echo [INFO] Service access addresses:
+    echo   Frontend: http://localhost
+    echo   Backend: http://localhost:8080
     echo   Redis: localhost:6379
     echo.
-    echo [提示] 查看日志: %DOCKER_COMPOSE_CMD% logs -f
-    echo [提示] 停止服务: %DOCKER_COMPOSE_CMD% down
+    echo [TIP] View logs: %DOCKER_COMPOSE_CMD% logs -f
+    echo [TIP] Stop services: %DOCKER_COMPOSE_CMD% down
 )
 goto :end
 
 :stop
-echo [信息] 停止所有服�?..
+echo [INFO] Stopping all services...
 call %DOCKER_COMPOSE_CMD% down
-echo [成功] 服务已停�?
+echo [SUCCESS] Services stopped
 goto :end
 
 :restart
-echo [信息] 重启所有服�?..
+echo [INFO] Restarting all services...
 call %DOCKER_COMPOSE_CMD% restart
-echo [成功] 服务已重�?
+echo [SUCCESS] Services restarted
+goto :end
+
+:restart_backend
+echo [INFO] Restarting backend service...
+call %DOCKER_COMPOSE_CMD% restart backend
+echo [SUCCESS] Backend service restarted
+goto :end
+
+:restart_frontend
+echo [INFO] Restarting frontend service...
+call %DOCKER_COMPOSE_CMD% restart frontend
+echo [SUCCESS] Frontend service restarted
 goto :end
 
 :logs
-echo [信息] 查看服务日志...
-call %DOCKER_COMPOSE_CMD% logs -f
+if "%SERVICE%"=="" (
+    echo [INFO] Viewing all service logs...
+    call %DOCKER_COMPOSE_CMD% logs -f
+) else (
+    echo [INFO] Viewing %SERVICE% service logs...
+    call %DOCKER_COMPOSE_CMD% logs -f %SERVICE%
+)
 goto :end
 
 :clean
-echo [信息] 清理Docker资源...
-echo [警告] 这将删除所有容器、镜像和卷，是否继续? (y/n)
+echo [INFO] Cleaning Docker resources...
+echo [WARNING] This will delete all containers, images and volumes, continue? (y/n)
 set /p response=
 if /i "!response!"=="y" (
     call %DOCKER_COMPOSE_CMD% down -v
     docker rmi documentgen-backend:latest documentgen-frontend:latest 2>nul
-    echo [成功] 清理完成
+    echo [SUCCESS] Cleanup completed
 ) else (
-    echo [信息] 已取消清�?
+    echo [INFO] Cleanup cancelled
 )
 goto :end
 
 :rebuild
-echo [信息] 重新构建并启动服�?..
+echo [INFO] Rebuilding and starting services...
 call %DOCKER_COMPOSE_CMD% down
 call %DOCKER_COMPOSE_CMD% build --no-cache
 call %DOCKER_COMPOSE_CMD% up -d
-echo [成功] 重新构建并启动完�?
+echo [SUCCESS] Rebuild and start completed
 goto :end
 
 :usage
-echo [错误] 未知操作: %ACTION%
+echo [ERROR] Unknown action: %ACTION%
 echo.
-echo 用法: %~nx0 [操作]
+echo Usage: %~nx0 [action] [service]
 echo.
-echo 可用操作:
-echo   build    - 构建Docker镜像
-echo   start    - 启动所有服�?
-echo   stop     - 停止所有服�?
-echo   restart  - 重启所有服�?
-echo   logs     - 查看服务日志
-echo   clean    - 清理所有Docker资源
-echo   rebuild  - 重新构建并启动服�?
+echo Available actions:
+echo   build              - Build all Docker images
+echo   build-backend      - Build backend image only
+echo   build-frontend     - Build frontend image only
+echo   start              - Start all services
+echo   stop               - Stop all services
+echo   restart            - Restart all services
+echo   restart-backend    - Restart backend service only
+echo   restart-frontend   - Restart frontend service only
+echo   logs [service]     - View service logs (all services if service not specified)
+echo   clean              - Clean all Docker resources
+echo   rebuild            - Rebuild and start all services
 echo.
-echo 示例:
-echo   %~nx0 build    # 构建镜像
-echo   %~nx0 start    # 启动服务
-echo   %~nx0 rebuild  # 重新构建并启�?
+echo Examples:
+echo   %~nx0 build              # Build all images
+echo   %~nx0 build-backend      # Build backend only
+echo   %~nx0 build-frontend     # Build frontend only
+echo   %~nx0 restart-backend    # Restart backend only
+echo   %~nx0 restart-frontend   # Restart frontend only
+echo   %~nx0 logs backend       # View backend logs
 exit /b 1
 
 :end
 endlocal
-
-

@@ -2,7 +2,9 @@
 
 param(
     [Parameter(Position=0)]
-    [string]$Action = "build"
+    [string]$Action = "build",
+    [Parameter(Position=1)]
+    [string]$Service = ""
 )
 
 # 颜色输出函数
@@ -79,6 +81,44 @@ switch ($Action.ToLower()) {
         }
     }
     
+    "build-backend" {
+        Write-ColorOutput Yellow "开始构建后端镜像..."
+        docker build -t documentgen-backend:latest -f Dockerfile .
+        
+        if ($LASTEXITCODE -ne 0) {
+            Write-ColorOutput Red "后端镜像构建失败"
+            exit 1
+        }
+        
+        Write-ColorOutput Green "后端镜像构建完成！"
+        Write-Output ""
+        $response = Read-Host "是否现在重启后端服务? (y/n)"
+        if ($response -match "^[yY]") {
+            Invoke-Expression "$dockerComposeCmd up -d --build backend"
+            Write-ColorOutput Green "后端服务已重启"
+        }
+        exit 0
+    }
+    
+    "build-frontend" {
+        Write-ColorOutput Yellow "开始构建前端镜像..."
+        docker build -t documentgen-frontend:latest -f swagger-admin/Dockerfile swagger-admin/
+        
+        if ($LASTEXITCODE -ne 0) {
+            Write-ColorOutput Red "前端镜像构建失败"
+            exit 1
+        }
+        
+        Write-ColorOutput Green "前端镜像构建完成！"
+        Write-Output ""
+        $response = Read-Host "是否现在重启前端服务? (y/n)"
+        if ($response -match "^[yY]") {
+            Invoke-Expression "$dockerComposeCmd up -d --build frontend"
+            Write-ColorOutput Green "前端服务已重启"
+        }
+        exit 0
+    }
+    
     "start" {
         Write-ColorOutput Yellow "启动所有服务..."
         Invoke-Expression "$dockerComposeCmd up -d"
@@ -111,9 +151,26 @@ switch ($Action.ToLower()) {
         Write-ColorOutput Green "服务已重启"
     }
     
+    "restart-backend" {
+        Write-ColorOutput Yellow "重启后端服务..."
+        Invoke-Expression "$dockerComposeCmd restart backend"
+        Write-ColorOutput Green "后端服务已重启"
+    }
+    
+    "restart-frontend" {
+        Write-ColorOutput Yellow "重启前端服务..."
+        Invoke-Expression "$dockerComposeCmd restart frontend"
+        Write-ColorOutput Green "前端服务已重启"
+    }
+    
     "logs" {
-        Write-ColorOutput Yellow "查看服务日志..."
-        Invoke-Expression "$dockerComposeCmd logs -f"
+        if ($Service) {
+            Write-ColorOutput Yellow "查看 $Service 服务日志..."
+            Invoke-Expression "$dockerComposeCmd logs -f $Service"
+        } else {
+            Write-ColorOutput Yellow "查看所有服务日志..."
+            Invoke-Expression "$dockerComposeCmd logs -f"
+        }
     }
     
     "clean" {
@@ -140,21 +197,27 @@ switch ($Action.ToLower()) {
     default {
         Write-ColorOutput Red "未知操作: $Action"
         Write-Output ""
-        Write-Output "用法: .\build-and-run.ps1 [操作]"
+        Write-Output "用法: .\build-and-run.ps1 [操作] [服务名]"
         Write-Output ""
         Write-Output "可用操作:"
-        Write-Output "  build    - 构建Docker镜像"
-        Write-Output "  start    - 启动所有服务"
-        Write-Output "  stop     - 停止所有服务"
-        Write-Output "  restart  - 重启所有服务"
-        Write-Output "  logs     - 查看服务日志"
-        Write-Output "  clean    - 清理所有Docker资源"
-        Write-Output "  rebuild  - 重新构建并启动服务"
+        Write-Output "  build              - 构建所有Docker镜像"
+        Write-Output "  build-backend      - 只构建后端镜像"
+        Write-Output "  build-frontend     - 只构建前端镜像"
+        Write-Output "  start              - 启动所有服务"
+        Write-Output "  stop               - 停止所有服务"
+        Write-Output "  restart            - 重启所有服务"
+        Write-Output "  restart-backend    - 只重启后端服务"
+        Write-Output "  restart-frontend   - 只重启前端服务"
+        Write-Output "  logs [服务名]      - 查看服务日志（不指定服务名则查看所有）"
+        Write-Output "  clean              - 清理所有Docker资源"
+        Write-Output "  rebuild            - 重新构建并启动所有服务"
         Write-Output ""
         Write-Output "示例:"
-        Write-Output "  .\build-and-run.ps1 build    # 构建镜像"
-        Write-Output "  .\build-and-run.ps1 start    # 启动服务"
-        Write-Output "  .\build-and-run.ps1 rebuild  # 重新构建并启动"
+        Write-Output "  .\build-and-run.ps1 build              # 构建所有镜像"
+        Write-Output "  .\build-and-run.ps1 build-backend      # 只构建后端"
+        Write-Output "  .\build-and-run.ps1 build-frontend    # 只构建前端"
+        Write-Output "  .\build-and-run.ps1 restart-backend   # 只重启后端"
+        Write-Output "  .\build-and-run.ps1 logs backend       # 查看后端日志"
         exit 1
     }
 }
@@ -179,4 +242,3 @@ if ($Action -eq "start") {
         exit 1
     }
 }
-

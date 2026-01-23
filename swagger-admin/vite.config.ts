@@ -17,7 +17,7 @@ export default defineConfig({
         changeOrigin: true,
         secure: false
       },
-      '/swagger/swagger-resources': {
+      '/swagger': {
         target: 'https://newdev.rdapp.com:53839',
         changeOrigin: true,
         secure: false
