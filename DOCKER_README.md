@@ -75,7 +75,7 @@ documentGen/
 ### 前端镜像 (documentgen-frontend)
 - **构建镜像**: `node:20-alpine`
 - **运行镜像**: `nginx:alpine`
-- **端口**: 80
+- **端口**: 9999
 - **特点**:
   - 多阶段构建，只包含构建产物
   - Nginx反向代理配置
@@ -150,7 +150,7 @@ docker-compose up -d --build
 
 启动成功后，可以通过以下地址访问：
 
-- **前端**: http://localhost
+- **前端**: http://localhost:9999
 - **后端API**: http://localhost:9001
 - **Redis**: localhost:6379
 
@@ -285,7 +285,7 @@ docker-compose ps
 
 ### 1. 端口被占用
 
-如果9001或80端口被占用，可以修改 `docker-compose.yml` 中的端口映射：
+如果9001或9999端口被占用，可以修改 `docker-compose.yml` 中的端口映射：
 
 ```yaml
 ports:
