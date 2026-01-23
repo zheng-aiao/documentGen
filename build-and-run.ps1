@@ -81,6 +81,26 @@ switch ($Action.ToLower()) {
         }
     }
     
+    "start-backend" {
+        Write-ColorOutput Yellow "启动后端服务..."
+        Invoke-Expression "$dockerComposeCmd up -d backend"
+        if ($LASTEXITCODE -ne 0) {
+            Write-ColorOutput Red "后端服务启动失败"
+            exit 1
+        }
+        Write-ColorOutput Green "后端服务已启动"
+    }
+    
+    "start-frontend" {
+        Write-ColorOutput Yellow "启动前端服务..."
+        Invoke-Expression "$dockerComposeCmd up -d frontend"
+        if ($LASTEXITCODE -ne 0) {
+            Write-ColorOutput Red "前端服务启动失败"
+            exit 1
+        }
+        Write-ColorOutput Green "前端服务已启动"
+    }
+    
     "build-backend" {
         Write-ColorOutput Yellow "开始构建后端镜像..."
         docker build -t documentgen-backend:latest -f Dockerfile .
@@ -145,6 +165,26 @@ switch ($Action.ToLower()) {
         Write-ColorOutput Green "服务已停止"
     }
     
+    "stop-backend" {
+        Write-ColorOutput Yellow "停止后端服务..."
+        Invoke-Expression "$dockerComposeCmd stop backend"
+        if ($LASTEXITCODE -ne 0) {
+            Write-ColorOutput Red "后端服务停止失败"
+            exit 1
+        }
+        Write-ColorOutput Green "后端服务已停止"
+    }
+    
+    "stop-frontend" {
+        Write-ColorOutput Yellow "停止前端服务..."
+        Invoke-Expression "$dockerComposeCmd stop frontend"
+        if ($LASTEXITCODE -ne 0) {
+            Write-ColorOutput Red "前端服务停止失败"
+            exit 1
+        }
+        Write-ColorOutput Green "前端服务已停止"
+    }
+    
     "restart" {
         Write-ColorOutput Yellow "重启所有服务..."
         Invoke-Expression "$dockerComposeCmd restart"
@@ -204,7 +244,11 @@ switch ($Action.ToLower()) {
         Write-Output "  build-backend      - 只构建后端镜像"
         Write-Output "  build-frontend     - 只构建前端镜像"
         Write-Output "  start              - 启动所有服务"
+        Write-Output "  start-backend      - 只启动后端服务"
+        Write-Output "  start-frontend     - 只启动前端服务"
         Write-Output "  stop               - 停止所有服务"
+        Write-Output "  stop-backend       - 只停止后端服务"
+        Write-Output "  stop-frontend      - 只停止前端服务"
         Write-Output "  restart            - 重启所有服务"
         Write-Output "  restart-backend    - 只重启后端服务"
         Write-Output "  restart-frontend   - 只重启前端服务"
@@ -216,6 +260,10 @@ switch ($Action.ToLower()) {
         Write-Output "  .\build-and-run.ps1 build              # 构建所有镜像"
         Write-Output "  .\build-and-run.ps1 build-backend      # 只构建后端"
         Write-Output "  .\build-and-run.ps1 build-frontend    # 只构建前端"
+        Write-Output "  .\build-and-run.ps1 start-backend     # 只启动后端"
+        Write-Output "  .\build-and-run.ps1 start-frontend    # 只启动前端"
+        Write-Output "  .\build-and-run.ps1 stop-backend      # 只停止后端"
+        Write-Output "  .\build-and-run.ps1 stop-frontend     # 只停止前端"
         Write-Output "  .\build-and-run.ps1 restart-backend   # 只重启后端"
         Write-Output "  .\build-and-run.ps1 logs backend       # 查看后端日志"
         exit 1

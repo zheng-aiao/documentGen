@@ -69,6 +69,26 @@ case $ACTION in
             exit 0
         fi
         ;;
+
+    start-backend)
+        echo -e "${YELLOW}启动后端服务...${NC}"
+        $DOCKER_COMPOSE up -d backend
+        if [ $? -ne 0 ]; then
+            echo -e "${RED}后端服务启动失败${NC}"
+            exit 1
+        fi
+        echo -e "${GREEN}后端服务已启动${NC}"
+        ;;
+
+    start-frontend)
+        echo -e "${YELLOW}启动前端服务...${NC}"
+        $DOCKER_COMPOSE up -d frontend
+        if [ $? -ne 0 ]; then
+            echo -e "${RED}前端服务启动失败${NC}"
+            exit 1
+        fi
+        echo -e "${GREEN}前端服务已启动${NC}"
+        ;;
     
     build-backend)
         echo -e "${YELLOW}开始构建后端镜像...${NC}"
@@ -135,6 +155,26 @@ case $ACTION in
         $DOCKER_COMPOSE down
         echo -e "${GREEN}服务已停止${NC}"
         ;;
+
+    stop-backend)
+        echo -e "${YELLOW}停止后端服务...${NC}"
+        $DOCKER_COMPOSE stop backend
+        if [ $? -ne 0 ]; then
+            echo -e "${RED}后端服务停止失败${NC}"
+            exit 1
+        fi
+        echo -e "${GREEN}后端服务已停止${NC}"
+        ;;
+
+    stop-frontend)
+        echo -e "${YELLOW}停止前端服务...${NC}"
+        $DOCKER_COMPOSE stop frontend
+        if [ $? -ne 0 ]; then
+            echo -e "${RED}前端服务停止失败${NC}"
+            exit 1
+        fi
+        echo -e "${GREEN}前端服务已停止${NC}"
+        ;;
     
     restart)
         echo -e "${YELLOW}重启所有服务...${NC}"
@@ -195,7 +235,11 @@ case $ACTION in
         echo "  build-backend      - 只构建后端镜像"
         echo "  build-frontend     - 只构建前端镜像"
         echo "  start              - 启动所有服务"
+        echo "  start-backend      - 只启动后端服务"
+        echo "  start-frontend     - 只启动前端服务"
         echo "  stop               - 停止所有服务"
+        echo "  stop-backend       - 只停止后端服务"
+        echo "  stop-frontend      - 只停止前端服务"
         echo "  restart            - 重启所有服务"
         echo "  restart-backend    - 只重启后端服务"
         echo "  restart-frontend   - 只重启前端服务"
@@ -207,6 +251,10 @@ case $ACTION in
         echo "  $0 build              # 构建所有镜像"
         echo "  $0 build-backend      # 只构建后端"
         echo "  $0 build-frontend     # 只构建前端"
+        echo "  $0 start-backend      # 只启动后端"
+        echo "  $0 start-frontend     # 只启动前端"
+        echo "  $0 stop-backend       # 只停止后端"
+        echo "  $0 stop-frontend      # 只停止前端"
         echo "  $0 restart-backend    # 只重启后端"
         echo "  $0 restart-frontend   # 只重启前端"
         echo "  $0 logs backend       # 查看后端日志"

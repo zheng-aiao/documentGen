@@ -4,6 +4,10 @@ FROM maven:3.9-eclipse-temurin-17 AS builder
 # 设置工作目录
 WORKDIR /app
 
+# 使用外置 Maven settings（例如阿里云镜像），避免构建时访问默认中央仓库失败
+# 1) 覆盖 Maven 全局 settings
+COPY settings-docker.xml /usr/share/maven/conf/settings.xml
+
 # 先复制本地JAR文件和pom.xml
 COPY lib ./lib
 COPY pom.xml .

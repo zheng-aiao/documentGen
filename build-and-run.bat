@@ -44,7 +44,11 @@ if /i "%ACTION%"=="build" goto :build
 if /i "%ACTION%"=="build-backend" goto :build_backend
 if /i "%ACTION%"=="build-frontend" goto :build_frontend
 if /i "%ACTION%"=="start" goto :start
+if /i "%ACTION%"=="start-backend" goto :start_backend
+if /i "%ACTION%"=="start-frontend" goto :start_frontend
 if /i "%ACTION%"=="stop" goto :stop
+if /i "%ACTION%"=="stop-backend" goto :stop_backend
+if /i "%ACTION%"=="stop-frontend" goto :stop_frontend
 if /i "%ACTION%"=="restart" goto :restart
 if /i "%ACTION%"=="restart-backend" goto :restart_backend
 if /i "%ACTION%"=="restart-frontend" goto :restart_frontend
@@ -131,10 +135,54 @@ if errorlevel 1 (
 )
 goto :end
 
+:start_backend
+echo [INFO] Starting backend service...
+call %DOCKER_COMPOSE_CMD% up -d backend
+if errorlevel 1 (
+    echo [ERROR] Failed to start backend service
+    exit /b 1
+) else (
+    echo [SUCCESS] Backend service started!
+)
+goto :end
+
+:start_frontend
+echo [INFO] Starting frontend service...
+call %DOCKER_COMPOSE_CMD% up -d frontend
+if errorlevel 1 (
+    echo [ERROR] Failed to start frontend service
+    exit /b 1
+) else (
+    echo [SUCCESS] Frontend service started!
+)
+goto :end
+
 :stop
 echo [INFO] Stopping all services...
 call %DOCKER_COMPOSE_CMD% down
 echo [SUCCESS] Services stopped
+goto :end
+
+:stop_backend
+echo [INFO] Stopping backend service...
+call %DOCKER_COMPOSE_CMD% stop backend
+if errorlevel 1 (
+    echo [ERROR] Failed to stop backend service
+    exit /b 1
+) else (
+    echo [SUCCESS] Backend service stopped
+)
+goto :end
+
+:stop_frontend
+echo [INFO] Stopping frontend service...
+call %DOCKER_COMPOSE_CMD% stop frontend
+if errorlevel 1 (
+    echo [ERROR] Failed to stop frontend service
+    exit /b 1
+) else (
+    echo [SUCCESS] Frontend service stopped
+)
 goto :end
 
 :restart
@@ -196,7 +244,11 @@ echo   build              - Build all Docker images
 echo   build-backend      - Build backend image only
 echo   build-frontend     - Build frontend image only
 echo   start              - Start all services
+echo   start-backend      - Start backend service only
+echo   start-frontend     - Start frontend service only
 echo   stop               - Stop all services
+echo   stop-backend       - Stop backend service only
+echo   stop-frontend      - Stop frontend service only
 echo   restart            - Restart all services
 echo   restart-backend    - Restart backend service only
 echo   restart-frontend   - Restart frontend service only
@@ -208,6 +260,10 @@ echo Examples:
 echo   %~nx0 build              # Build all images
 echo   %~nx0 build-backend      # Build backend only
 echo   %~nx0 build-frontend     # Build frontend only
+echo   %~nx0 start-backend      # Start backend only
+echo   %~nx0 start-frontend     # Start frontend only
+echo   %~nx0 stop-backend       # Stop backend only
+echo   %~nx0 stop-frontend      # Stop frontend only
 echo   %~nx0 restart-backend    # Restart backend only
 echo   %~nx0 restart-frontend   # Restart frontend only
 echo   %~nx0 logs backend       # View backend logs

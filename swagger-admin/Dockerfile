@@ -19,8 +19,12 @@ RUN npm run build
 # 生产阶段 - 使用Nginx服务静态文件
 FROM nginx:alpine
 
-# 安装wget用于健康检查
-RUN apk add --no-cache wget
+# 允许通过构建参数自定义 APK 镜像源（默认使用阿里云或你自己的镜像地址）
+ARG APK_REPO_URL=https://mirrors.aliyun.com/alpine/v3.18/main
+
+# 使用指定的 APK 镜像源并安装 wget（用于健康检查）
+RUN echo "${APK_REPO_URL}" > /etc/apk/repositories && \
+    apk add --no-cache wget
 
 # 复制构建产物到Nginx目录
 COPY --from=builder /app/dist /usr/share/nginx/html
